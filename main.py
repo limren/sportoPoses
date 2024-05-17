@@ -44,16 +44,38 @@ def load_images_from_folder(dataset_path):
 dataset_path = "./datasets"
 datasets = load_images_from_folder(dataset_path)
 training_images = []
-datasets_labels = []
+training_labels = []
 
-for index, dataset in enumerate(datasets):
-    print("dataset : ", index, dataset)
-    for image in dataset:
+# We get the indexes of enumerate(datasets) : squat = 0 & benchPress = 1
+training_images = []
+training_labels = []
+
+for index, (dataset_name, images) in enumerate(datasets.items()):
+    print("Dataset:", index, dataset_name)
+    dataset_path_resized = dataset_name + "_resized"
+    fullPath = os.path.join(dataset_path, dataset_path_resized)
+
+    # Create directory for resized images if it doesn't exist
+    if not os.path.exists(fullPath):
+        os.mkdir(fullPath)
+
+    for i, image in enumerate(images):
+        # Resize the image
         resized_image = cv.resize(image, (125, 125))
 
-# training_images, testing_images = training_images/255, testing_images/255
+        # Append to training data
+        training_images.append(resized_image)
+        training_labels.append(index)
 
+        # Save the resized image
+        image_filename = f"{dataset_name}_{i}.jpg"
+        cv.imwrite(os.path.join(fullPath, image_filename), resized_image)
 
+# Convert training data to np arrays
+training_images = np.array(training_images)
+training_labels = np.array(training_labels)
+
+# MODEL CONFIGURATION - 3 convolutions layers with MaxPooling & softmax function for predictions
 model = models.Sequential()
 # We add convolution layer with 32 filters filtering 3 per 3 pixels from images, input shape is 32x32x3 for basics
 model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(32, 32, 3)))
