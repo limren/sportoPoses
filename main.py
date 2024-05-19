@@ -106,7 +106,6 @@ benchPressTest = cv.imread('benchPress.jpg')
 benchPressTest = cv.cvtColor(benchPressTest, cv.COLOR_BGR2RGB)
 benchPressTest = cv.resize(benchPressTest, (125, 125))
 
-# plt.imshow(squatTest, cmap=plt.cm.binary)
 
 predictionSquat = model.predict(np.array([squatTest])/255)
 predictionBenchPress = model.predict(np.array([benchPressTest])/255)
