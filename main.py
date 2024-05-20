@@ -6,8 +6,13 @@ from tensorflow.keras import layers, models
 
 
 # Possibilities
-class_names = ['benchPress', 'squat']
+class_names = ['bench press', 'squat', 'standing']
 
+model_name = "sportsPosesClassifier.keras"
+
+
+
+# model = models.load_model(model_name)
 
 def load_images_from_folder(dataset_path):
     """
@@ -38,79 +43,108 @@ def load_images_from_folder(dataset_path):
 
     return data
 
+if(not os.path.exists(model_name)):
+    dataset_path = "./datasets"
+    datasets = load_images_from_folder(dataset_path)
+    validation_images = []
+    validation_labels = []
 
-dataset_path = "./datasets"
-datasets = load_images_from_folder(dataset_path)
-training_images = []
-training_labels = []
+    # We get the indexes of enumerate(datasets) : squat = 0 & benchPress = 1
+    training_images = []
+    training_labels = []
 
-# We get the indexes of enumerate(datasets) : squat = 0 & benchPress = 1
-training_images = []
-training_labels = []
+    for index, (dataset_name, images) in enumerate(datasets.items()):
+        # print("Dataset:", index, dataset_name)
+        dataset_path_resized = dataset_name + "_resized"
+        fullPath = os.path.join(dataset_path, dataset_path_resized)
+        print("index : ", index, dataset_name)
+        # Create directory for resized images if it doesn't exist
+        if not os.path.exists(fullPath):
+            os.mkdir(fullPath)
 
-for index, (dataset_name, images) in enumerate(datasets.items()):
-    # print("Dataset:", index, dataset_name)
-    dataset_path_resized = dataset_name + "_resized"
-    fullPath = os.path.join(dataset_path, dataset_path_resized)
+        half = len(images) // 2
 
-    # Create directory for resized images if it doesn't exist
-    if not os.path.exists(fullPath):
-        os.mkdir(fullPath)
+        for i, image in enumerate(images):
+            # Resize the image
+            resized_image = cv.resize(image, (125, 125))
 
-    for i, image in enumerate(images):
-        # Resize the image
-        resized_image = cv.resize(image, (125, 125))
+            if i>half:
+                # Append to training data
+                training_images.append(resized_image)
+                training_labels.append([index])
+            else:
+                validation_images.append(resized_image)
+                validation_labels.append([index])
 
-        # Append to training data
-        training_images.append(resized_image)
-        training_labels.append([index])
+            # Save the resized image
+            image_filename = f"{dataset_name}_{i}.jpg"
+            cv.imwrite(os.path.join(fullPath, image_filename), resized_image)
 
-        # Save the resized image
-        image_filename = f"{dataset_name}_{i}.jpg"
-        cv.imwrite(os.path.join(fullPath, image_filename), resized_image)
+    # Convert training data to np arrays
+    training_images = np.array(training_images)/255
+    training_labels = np.array(training_labels)
 
-# Convert training data to np arrays
-training_images = np.array(training_images)/255
-training_labels = np.array(training_labels)
-
-# print(training_images[:3], training_labels[:3])
-
-# MODEL CONFIGURATION - 3 convolutions layers with MaxPooling & softmax function for predictions
-model = models.Sequential()
-# We add convolution layer with 32 filters filtering 3 per 3 pixels from images, input shape is 32x32x3 for basics
-model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(125, 125, 3)))
-# We add MaxPooling2D to filter the max between the array by going 2 by 2 from width to height, be careful
-# at how TF invert array shape
-model.add(layers.MaxPooling2D((2, 2)))
-model.add(layers.Conv2D(64, (3, 3), activation='relu'))
-model.add(layers.MaxPooling2D((2, 2)))
-model.add(layers.Conv2D(64, (3, 3), activation='relu'))
-model.add(layers.Flatten())
-model.add(layers.Dense(64, activation='relu'))
-model.add(layers.Dense(2, activation='softmax'))
-
-model.compile(optimizer='adam',
-              loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-# I let the same for training & validation data for now
-model.fit(training_images, training_labels, epochs=20,
-          validation_data=(training_images, training_labels))
+    validation_images = np.array(validation_images)/255
+    validation_labels = np.array(validation_labels)
 
 
-model.save("sportsPosesClassifier.keras")
+    # MODEL CONFIGURATION - 3 convolutions layers with MaxPooling & softmax function for predictions
+    model = models.Sequential()
+    # We add convolution layer with 32 filters filtering 3 per 3 pixels from images, input shape is 32x32x3 for basics
+    model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(125, 125, 3)))
+    # We add MaxPooling2D to filter the max between the array by going 2 by 2 from width to height, be careful
+    # at how TF invert array shape
+    model.add(layers.MaxPooling2D((2, 2)))
+    model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+    model.add(layers.MaxPooling2D((2, 2)))
+    model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+    model.add(layers.Flatten())
+    model.add(layers.Dense(64, activation='relu'))
+    model.add(layers.Dense(3, activation='softmax'))
+
+    model.compile(optimizer='adam',
+                loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    # I let the same for training & validation data for now
+    model.fit(training_images, training_labels, epochs=15,
+            validation_data=(validation_images, validation_labels))
+
+
+    model.save("sportsPosesClassifier.keras")
+else:
+    model = models.load_model(model_name)
+
+
+
+
+standingTest = cv.imread('standing.png')
+standingTest = cv.cvtColor(standingTest, cv.COLOR_BGR2RGB)
+standingTest = cv.resize(standingTest, (125, 125))
 
 squatTest = cv.imread('squat.jpg')
 squatTest = cv.cvtColor(squatTest, cv.COLOR_BGR2RGB)
 squatTest = cv.resize(squatTest, (125, 125))
 
+
+squatTest2 = cv.imread('squat2.jpg')
+squatTest2 = cv.cvtColor(squatTest2, cv.COLOR_BGR2RGB)
+squatTest2 = cv.resize(squatTest2, (125, 125))
+
+
+
 benchPressTest = cv.imread('benchPress.jpg')
 benchPressTest = cv.cvtColor(benchPressTest, cv.COLOR_BGR2RGB)
 benchPressTest = cv.resize(benchPressTest, (125, 125))
 
-
+predictionStanding = model.predict(np.array([standingTest])/255)
 predictionSquat = model.predict(np.array([squatTest])/255)
+predictionSquat2 = model.predict(np.array([squatTest2])/255)
 predictionBenchPress = model.predict(np.array([benchPressTest])/255)
+indexStanding = np.argmax(predictionStanding)
 indexSquat = np.argmax(predictionSquat)
+indexSquat2 = np.argmax(predictionSquat2)
 indexBenchPress = np.argmax(predictionBenchPress)
 
+print("prediction standing :", class_names[indexStanding])
 print("prediction squat :", class_names[indexSquat])
+print("prediction squat2 :", class_names[indexSquat2])
 print("prediction bench press :", class_names[indexBenchPress])
