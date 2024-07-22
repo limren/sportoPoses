@@ -6,7 +6,7 @@ from tensorflow.keras import layers, models
 
 
 # Possibilities
-class_names = ['bench press', 'squat', 'standing']
+class_names = ['bench press', 'squat']
 
 model_name = "sportsPosesClassifier.keras"
 
@@ -62,7 +62,7 @@ if(not os.path.exists(model_name)):
         if not os.path.exists(fullPath):
             os.mkdir(fullPath)
 
-        half = len(images) // 2
+        half = len(images)/4
 
         for i, image in enumerate(images):
             # Resize the image
@@ -105,7 +105,7 @@ if(not os.path.exists(model_name)):
     model.compile(optimizer='adam',
                 loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     # I let the same for training & validation data for now
-    model.fit(training_images, training_labels, epochs=15,
+    model.fit(training_images, training_labels, epochs=7,
             validation_data=(validation_images, validation_labels))
 
 
@@ -115,10 +115,6 @@ else:
 
 
 
-
-standingTest = cv.imread('standing.png')
-standingTest = cv.cvtColor(standingTest, cv.COLOR_BGR2RGB)
-standingTest = cv.resize(standingTest, (125, 125))
 
 squatTest = cv.imread('squat.jpg')
 squatTest = cv.cvtColor(squatTest, cv.COLOR_BGR2RGB)
@@ -135,16 +131,14 @@ benchPressTest = cv.imread('benchPress.jpg')
 benchPressTest = cv.cvtColor(benchPressTest, cv.COLOR_BGR2RGB)
 benchPressTest = cv.resize(benchPressTest, (125, 125))
 
-predictionStanding = model.predict(np.array([standingTest])/255)
 predictionSquat = model.predict(np.array([squatTest])/255)
 predictionSquat2 = model.predict(np.array([squatTest2])/255)
 predictionBenchPress = model.predict(np.array([benchPressTest])/255)
-indexStanding = np.argmax(predictionStanding)
+
 indexSquat = np.argmax(predictionSquat)
 indexSquat2 = np.argmax(predictionSquat2)
 indexBenchPress = np.argmax(predictionBenchPress)
 
-print("prediction standing :", class_names[indexStanding])
-print("prediction squat :", class_names[indexSquat])
-print("prediction squat2 :", class_names[indexSquat2])
-print("prediction bench press :", class_names[indexBenchPress])
+print("prediction squat :", class_names[indexSquat], indexSquat)
+print("prediction squat2 :", class_names[indexSquat2], indexSquat2)
+print("prediction bench press :", class_names[indexBenchPress], indexBenchPress)
