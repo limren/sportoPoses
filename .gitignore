@@ -1,3 +1,3 @@
-/datasets/*_resized
+/datasets
 __pycache__
 .venv
