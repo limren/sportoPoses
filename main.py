@@ -3,111 +3,90 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from tensorflow.keras import layers, models
-
-
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+import tensorflow as tf
 # Possibilities
 class_names = ['bench press', 'squat']
 
 model_name = "sportsPosesClassifier.keras"
 
-
-# model = models.load_model(model_name)
-
-def load_images_from_folder(dataset_path):
-    """
-    Load images from a dataset folder containing multiple subfolders with images.
-
-    :param dataset_path: Path to the dataset folder.
-    :return: A dictionary where keys are subfolder names and values are lists of images.
-    """
-    data = {}
-
-    for subdir in os.listdir(dataset_path):
-        print("subdir : ", subdir)
-        subdir_path = os.path.join(dataset_path, subdir)
-
-        if os.path.isdir(subdir_path):
-            images = []
-
-            for filename in os.listdir(subdir_path):
-                file_path = os.path.join(subdir_path, filename)
-
-                image = cv.imread(file_path)
-
-                if image is not None:
-                    images.append(image)
-
-            # Store the images in the dictionary with the subdirectory name as key
-            data[subdir] = images
-
-    return data
-
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        # Optionally limit TensorFlow to only use a certain amount of GPU memory
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        print(f"GPU detected: {gpus}")
+    except RuntimeError as e:
+        print(e)
+else:
+    print("No GPU detected, running on CPU.")
 
 if (not os.path.exists(model_name)):
-    dataset_path = "./datasets"
-    datasets = load_images_from_folder(dataset_path)
-    validation_images = []
-    validation_labels = []
+    datagen = ImageDataGenerator(
+        rescale=1./255,
+        rotation_range=20,
+        width_shift_range=0.2,
+        height_shift_range=0.2,
+        shear_range=0.2,
+        zoom_range=0.2,
+        horizontal_flip=True,
+        validation_split=0.2
+    )
 
-    # We get the indexes of enumerate(datasets) : squat = 0 & benchPress = 1
-    training_images = []
-    training_labels = []
+    train_generator = datagen.flow_from_directory(
+        './datasets',
+        target_size=(96, 96),
+        batch_size=64,
+        class_mode='sparse',
+        subset='training'
+    )
 
-    for index, (dataset_name, images) in enumerate(datasets.items()):
-        # print("Dataset:", index, dataset_name)
-        dataset_path_resized = dataset_name + "_resized"
-        fullPath = os.path.join(dataset_path, dataset_path_resized)
-        print("index : ", index, dataset_name)
-        # Create directory for resized images if it doesn't exist
-        if not os.path.exists(fullPath):
-            os.mkdir(fullPath)
+    validation_generator = datagen.flow_from_directory(
+        './datasets',
+        target_size=(96, 96),
+        batch_size=64,
+        class_mode='sparse',
+        subset='validation'
+    )
 
-        half = len(images)/4
-
-        for i, image in enumerate(images):
-            # Resize the image
-            resized_image = cv.resize(image, (125, 125))
-
-            if i > half:
-                # Append to training data
-                training_images.append(resized_image)
-                training_labels.append([index])
-            else:
-                validation_images.append(resized_image)
-                validation_labels.append([index])
-
-            # Save the resized image
-            image_filename = f"{dataset_name}_{i}.jpg"
-            cv.imwrite(os.path.join(fullPath, image_filename), resized_image)
-
-    # Convert training data to np arrays
-    training_images = np.array(training_images)/255
-    training_labels = np.array(training_labels)
-
-    validation_images = np.array(validation_images)/255
-    validation_labels = np.array(validation_labels)
+    print(train_generator.class_indices)
 
     # MODEL CONFIGURATION - 3 convolutions layers with MaxPooling & softmax function for predictions
     model = models.Sequential()
-    # We add convolution layer with 32 filters filtering 3 per 3 pixels from images, input shape is 32x32x3 for basics
-    model.add(layers.Conv2D(32, (3, 3), activation='relu',
-              input_shape=(125, 125, 3)))
-    # We add MaxPooling2D to filter the max between the array by going 2 by 2 from width to height, be careful
-    # at how TF invert array shape
+    # We add convolution layers with 32 filters filtering 3 per 3 pixels from images, input shape is 64x64x3 for basics
+    # First Convolution Block
+    model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(96, 96, 3)))
+    model.add(layers.BatchNormalization())
     model.add(layers.MaxPooling2D((2, 2)))
+
+    # Second Convolution Block
     model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+    model.add(layers.BatchNormalization())
     model.add(layers.MaxPooling2D((2, 2)))
-    model.add(layers.Conv2D(64, (3, 3), activation='relu'))
-    model.add(layers.Dropout(0.5))
-    model.add(layers.Flatten())
+
+    # Third Convolution Block
+    model.add(layers.Conv2D(128, (3, 3), activation='relu'))
+    model.add(layers.BatchNormalization())
+    model.add(layers.MaxPooling2D((2, 2)))
+
+    # Fourth Convolution Block
+    model.add(layers.Conv2D(128, (3, 3), activation='relu'))
+    model.add(layers.BatchNormalization())
+    model.add(layers.MaxPooling2D((2, 2)))
+
+    # Global Average Pooling
+    model.add(layers.GlobalAveragePooling2D())
+
+    # Fully Connected Layers
+    model.add(layers.Dropout(0.5))  # Dropout layer for regularization
     model.add(layers.Dense(64, activation='relu'))
     model.add(layers.Dense(len(class_names), activation='softmax'))
 
-    model.compile(optimizer='adam',
-                  loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
-    model.fit(training_images, training_labels, epochs=7,
-              validation_data=(validation_images, validation_labels))
+    model.fit(train_generator, epochs=12,
+              validation_data=validation_generator)
 
     model.save("sportsPosesClassifier.keras")
 else:
@@ -116,17 +95,17 @@ else:
 
 squatTest = cv.imread('squat.jpg')
 squatTest = cv.cvtColor(squatTest, cv.COLOR_BGR2RGB)
-squatTest = cv.resize(squatTest, (125, 125))
+squatTest = cv.resize(squatTest, (64, 64))
 
 
 squatTest2 = cv.imread('squat2.jpg')
 squatTest2 = cv.cvtColor(squatTest2, cv.COLOR_BGR2RGB)
-squatTest2 = cv.resize(squatTest2, (125, 125))
+squatTest2 = cv.resize(squatTest2, (64, 64))
 
 
 benchPressTest = cv.imread('benchPress.jpg')
 benchPressTest = cv.cvtColor(benchPressTest, cv.COLOR_BGR2RGB)
-benchPressTest = cv.resize(benchPressTest, (125, 125))
+benchPressTest = cv.resize(benchPressTest, (64, 64))
 
 predictionSquat = model.predict(np.array([squatTest])/255)
 predictionSquat2 = model.predict(np.array([squatTest2])/255)
